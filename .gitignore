@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.eggs/
+*.egg-info/
+*.egg
+build/
+dist/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+report.html
+report.xml
+
+# Data & snapshots — demo run-time output
+examples/data/api_snapshots/*.json
+!examples/data/api_snapshots/.gitkeep
+
+# Secrets / local config
+config/env.yaml
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Claude Code / AI tool workspace state
+.claude/
+.mcp.json
+
+# Internal specs / references (user-local)
+.gdrive_specs/
