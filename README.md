@@ -184,9 +184,11 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Before opening a PR, please read [`docs/design.md`](docs/design.md) — it
-describes what's in/out of scope, the stability contract, and the design
-rationale. PRs that contradict anything there should update the doc first.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the local setup, branch +
+commit conventions, and PR checklist. Before opening a PR, please also
+skim [`docs/design.md`](docs/design.md) — it describes what's in/out of
+scope, the stability contract, and the design rationale. PRs that
+contradict anything there should update the doc first.
 
 PRs welcome, especially:
 - More auth adapters (SAML, JWT custom claims, mTLS)
