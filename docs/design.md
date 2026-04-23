@@ -1,5 +1,7 @@
 # Design
 
+**[繁體中文](#中文版) | English**
+
 Living document — short and opinionated. Updates require a follow-up commit
 with rationale. If you're reviewing a PR that contradicts anything here,
 reject first and ask the author to update this file as part of the change.
@@ -150,3 +152,108 @@ When reviewing a change, confirm:
 **This document is load-bearing.** When in doubt, link here in the
 conversation — the moment a new answer diverges from this file, either
 update the file first or reject the new answer.
+
+---
+
+## 中文版
+
+這份文件是**活的 spec** — 短、有態度、可以引用。每次 review PR 時如果跟這份衝突，先拒絕，要求作者把對應段落一起改掉再 merge。
+
+### 1. 範圍（Scope）
+
+#### 做什麼 ✅
+
+- **給 pytest 寫 API smoke / regression test 的腳手架** — 建 client、寫 assertion、產報告的基本 workflow
+- **可觀測性工具** — payload shape 自動 log、response size 追蹤、空陣列警告、snapshot drift 偵測
+- **零依賴的 schema 驗證** — 小型 DSL，夠用於 90% 的 response 結構驗證
+- **Pytest-HTML 擴充欄位** — Endpoint / Status / API Time / Size / Payload / Description 讓 team 能共讀
+- **Auth adapter 文件** — Bearer / OAuth / OTP / SAML 等接法寫成教學，不用 fork core
+
+#### 不做什麼 ❌
+
+- **Mock / record-replay server** — 用 `responses` / `vcrpy` / `pytest-httpx`
+- **Contract testing** — 用 Pact、Spectral
+- **壓力測試** — 用 Locust、k6
+- **UI / browser 測試** — 用 Playwright、Selenium
+- **測試資料工廠** — 用 `factory-boy` 或手寫 fixture
+- **CI runner / 儀表板部署** — 已拆到另外兩個 repo：`pytest-api-kit-aws`、`pytest-api-kit-dashboard`
+
+遇到「out of scope」的功能請求 → 直接引用本段 close issue。
+
+### 2. 穩定性承諾（Stability contract）
+
+從 0.2.0 起遵守 semver；0.1.0 是「盡力穩定」。公開介面範圍：
+
+#### 穩定 — 同 major 內不會動
+
+```python
+from api_kit import (
+    APIClient,
+    S, SchemaError, validate,
+    capture_schema, compare_with_snapshot, load_snapshot, save_snapshot,
+)
+from api_kit.fixtures import make_client_fixture, make_auth_client_fixture
+from api_kit.reporters.html_extras import CLIENT_FIXTURES, install_html_extras
+```
+
+`APIClient.{get, post, put, patch, delete, request, set_token, set_header}` 的簽名不動；可加新的 optional kwargs。
+
+Schema DSL 的 `S.str / S.int / S.any / S.optional / S.list_of(...)` 等值穩定。
+
+#### 內部 — 可能隨時改
+
+- 底線開頭（`_summarize_payload` 等）
+- `api_kit.reporters.html_extras._pytest_*` hook — 只能透過 `install_html_extras()` 間接使用
+- Snapshot 檔案的磁碟格式 — load/compare API 穩定，但不要自己 parse JSON
+- html_extras 注入的 CSS / HTML — 顏色、欄寬、格式保留調整空間
+
+需要倚賴「內部」項目 → 開 issue 要求升級成 public。
+
+### 3. 設計 rationale（FAQ）
+
+#### 為什麼不用 `jsonschema` 或 `pydantic`？
+
+因為 **零依賴** 是主打。新上 pytest 的 team 常常卡在相依性衝突一整天。S DSL 用 100 行覆蓋 90% 真實世界 response — 需要完整 JSON Schema 再 `pip install jsonschema` 搭配用，沒禁止。
+
+#### 為什麼不做成 `pytest` plugin（entry points / hook / config）？
+
+對這類問題，**腳手架 > plugin**：
+
+- Team 本來就會互相 copy fixture — 我們用 `templates/` / `examples/` 擁抱這行為
+- 零設定檔要學 — 裝完 `from api_kit import ...` 就上工
+- Fork `conftest.py` 改 hook 比 fork plugin 的 hook implementation 容易 100 倍
+
+#### 為什麼 AWS / dashboard 拆成獨立 repo？
+
+因為 90% user 不需要。`pip install pytest-api-kit` 不應該順便 `pip install boto3`。基礎設施的表面積比測試框架本體大 10 倍，拆開獨立演進更健康。
+
+#### 為什麼自己管 HTML 欄位，不做成可擴充 event bus？
+
+因為要顯示的三個核心欄（Endpoint / Status / Payload）都來自同一組 `APIClient.last_*` 屬性 — 抽象化只會逼每個 user 都去 config 該顯示什麼。模板刻意 opinionated — 需要不一樣的直接 **整個換掉** `html_extras.py`，不要去擴充它。
+
+#### 為什麼在 client 藏一個 `_last_response_data`？
+
+讓 pytest-html hook 和 snapshot hook 都能拿到上次 parse 過的 JSON，不用重 parse。用 `_` 前綴表示 test 不該直接讀；官方 snapshot example 讀它因為它本來就是 kit 的一部分。
+
+#### 為什麼 `install_html_extras()` 去 monkey-patch caller 的 `globals()`？
+
+因為 pytest **只在 module top-level** 找 `pytest_html_*` hook — user 一定會忘記把 hook re-export。Monkey-patch 是「最少 surprise」的做法，一個 call 搞定。
+
+#### 為什麼用一個 module-level 可變 list `CLIENT_FIXTURES` 讓 user `.extend()`？
+
+因為 reporter 要知道哪些 fixture 名字是 `APIClient` instance，而 pytest 沒有 introspect fixture type 的 API（只能靠名字）。共用一個 list + `.extend()` 是「最小可行」的 user-facing API。
+
+### 4. Review checklist
+
+Review PR 時，確認：
+
+- [ ] 沒踩進 §1 的「不做什麼」清單
+- [ ] 公開 API 有改 → §2 有對應更新 + CHANGELOG 一行
+- [ ] 如果改動和 §3 某個 rationale 矛盾 → PR 本身要更新那段
+- [ ] 沒加新的第三方相依（零依賴承諾）
+- [ ] `pytest examples/ -v` 仍綠（CI 會擋）
+- [ ] 新的 public behaviour 至少在 `examples/` 裡有一個 test cover
+
+---
+
+**這份文件是 load-bearing（承重的）**。有疑問直接貼連結 — 一旦新答案跟這裡矛盾，不是先更新文件，就是拒絕新答案。
